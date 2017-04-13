@@ -16,6 +16,7 @@ import (
 	_ "github.com/influxdata/telegraf/plugins/inputs/couchdb"
 	_ "github.com/influxdata/telegraf/plugins/inputs/disque"
 	_ "github.com/influxdata/telegraf/plugins/inputs/dmcache"
+	_ "github.com/influxdata/telegraf/plugins/inputs/dns_domain"	
 	_ "github.com/influxdata/telegraf/plugins/inputs/dns_query"
 	_ "github.com/influxdata/telegraf/plugins/inputs/docker"
 	_ "github.com/influxdata/telegraf/plugins/inputs/dovecot"
