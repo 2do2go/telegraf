@@ -4,7 +4,6 @@ import (
 	"time"
 	"errors"
 	"github.com/influxdata/telegraf"
-	"github.com/influxdata/telegraf/internal/errchan"
 	"github.com/influxdata/telegraf/plugins/inputs"
 	"github.com/likexian/whois-go"
 	"github.com/likexian/whois-parser-go"
@@ -50,7 +49,6 @@ func (c *CheckExpire) checkDomain(domain string) (time.Time, error) {
 
 // Gather gets all metric fields and tags and returns any errors it encounters
 func (c *CheckExpire) Gather(acc telegraf.Accumulator) error {
-	errChan := errchan.New(len(c.Domains))
 	for _, domain := range c.Domains {
 		// Prepare data
 		tags := map[string]string{"domain": domain}
@@ -58,7 +56,7 @@ func (c *CheckExpire) Gather(acc telegraf.Accumulator) error {
 		var timeToExpire time.Duration
 		timeNow := time.Now()
 		expireDate, err := c.checkDomain(domain)
-		errChan.C <- err
+		acc.AddError(err)
 		if err != nil {
 			timeToExpire = 0
 		} else {
@@ -68,7 +66,7 @@ func (c *CheckExpire) Gather(acc telegraf.Accumulator) error {
 		// Add metrics
 		acc.AddFields("dns_domain", fields, tags)
 	}
-	return errChan.Error()
+	return nil
 }
 
 func init() {
