@@ -5,7 +5,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -131,21 +130,15 @@ func (h *HTTPResponse) httpGather() (map[string]interface{}, error) {
 	// Start Timer
 	start := time.Now()
 	resp, err := h.client.Do(request)
-
 	if err != nil {
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			fields["result_type"] = "timeout"
-			return fields, nil
-		}
-		fields["result_type"] = "connection_failed"
 		if h.FollowRedirects {
-			return fields, nil
+			return nil, err
 		}
 		if urlError, ok := err.(*url.Error); ok &&
 			urlError.Err == ErrRedirectAttempted {
 			err = nil
 		} else {
-			return fields, nil
+			return nil, err
 		}
 	}
 	defer func() {
@@ -164,7 +157,7 @@ func (h *HTTPResponse) httpGather() (map[string]interface{}, error) {
 			h.compiledStringMatch = regexp.MustCompile(h.ResponseStringMatch)
 			if err != nil {
 				log.Printf("E! Failed to compile regular expression %s : %s", h.ResponseStringMatch, err)
-				fields["result_type"] = "response_string_mismatch"
+				fields["response_string_match"] = 0
 				return fields, nil
 			}
 		}
@@ -172,20 +165,16 @@ func (h *HTTPResponse) httpGather() (map[string]interface{}, error) {
 		bodyBytes, err := ioutil.ReadAll(resp.Body)
 		if err != nil {
 			log.Printf("E! Failed to read body of HTTP Response : %s", err)
-			fields["result_type"] = "response_string_mismatch"
 			fields["response_string_match"] = 0
 			return fields, nil
 		}
 
 		if h.compiledStringMatch.Match(bodyBytes) {
-			fields["result_type"] = "success"
 			fields["response_string_match"] = 1
 		} else {
-			fields["result_type"] = "response_string_mismatch"
 			fields["response_string_match"] = 0
 		}
-	} else {
-		fields["result_type"] = "success"
+
 	}
 
 	return fields, nil

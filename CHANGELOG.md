@@ -37,6 +37,7 @@
 - [#2917](https://github.com/influxdata/telegraf/issues/2917): Fix Aerospike input adds all nodes to a single series.
 
 ## v1.3.2 [unreleased]
+## v1.3.2 [2017-06-14]
 
 ### Bugfixes
 
