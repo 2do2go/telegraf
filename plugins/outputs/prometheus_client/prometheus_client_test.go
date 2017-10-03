@@ -144,7 +144,7 @@ func TestWrite_Sanitize(t *testing.T) {
 	require.True(t, ok)
 
 	require.Equal(t, map[string]string{
-		"tag_with_dash": "localhost_local"}, sample1.Labels)
+		"tag_with_dash": "localhost.local"}, sample1.Labels)
 }
 
 func TestWrite_Gauge(t *testing.T) {
@@ -187,6 +187,56 @@ func TestWrite_MixedValueType(t *testing.T) {
 	fam, ok := client.fam["foo"]
 	require.True(t, ok)
 	require.Equal(t, 1, len(fam.Samples))
+}
+
+func TestWrite_MixedValueTypeUpgrade(t *testing.T) {
+	now := time.Now()
+	p1, err := metric.New(
+		"foo",
+		map[string]string{"a": "x"},
+		map[string]interface{}{"value": 1.0},
+		now,
+		telegraf.Untyped)
+	p2, err := metric.New(
+		"foo",
+		map[string]string{"a": "y"},
+		map[string]interface{}{"value": 2.0},
+		now,
+		telegraf.Gauge)
+	var metrics = []telegraf.Metric{p1, p2}
+
+	client := NewClient()
+	err = client.Write(metrics)
+	require.NoError(t, err)
+
+	fam, ok := client.fam["foo"]
+	require.True(t, ok)
+	require.Equal(t, 2, len(fam.Samples))
+}
+
+func TestWrite_MixedValueTypeDowngrade(t *testing.T) {
+	now := time.Now()
+	p1, err := metric.New(
+		"foo",
+		map[string]string{"a": "x"},
+		map[string]interface{}{"value": 1.0},
+		now,
+		telegraf.Gauge)
+	p2, err := metric.New(
+		"foo",
+		map[string]string{"a": "y"},
+		map[string]interface{}{"value": 2.0},
+		now,
+		telegraf.Untyped)
+	var metrics = []telegraf.Metric{p1, p2}
+
+	client := NewClient()
+	err = client.Write(metrics)
+	require.NoError(t, err)
+
+	fam, ok := client.fam["foo"]
+	require.True(t, ok)
+	require.Equal(t, 2, len(fam.Samples))
 }
 
 func TestWrite_Tags(t *testing.T) {
