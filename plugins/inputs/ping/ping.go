@@ -5,6 +5,7 @@ package ping
 import (
 	"errors"
 	"fmt"
+	"net"
 	"os/exec"
 	"runtime"
 	"strconv"
@@ -76,6 +77,17 @@ func (p *Ping) Gather(acc telegraf.Accumulator) error {
 		wg.Add(1)
 		go func(u string) {
 			defer wg.Done()
+			tags := map[string]string{"url": u}
+			fields := map[string]interface{}{"result_code": 0}
+
+			_, err := net.LookupHost(u)
+			if err != nil {
+				acc.AddError(err)
+				fields["result_code"] = 1
+				acc.AddFields("ping", fields, tags)
+				return
+			}
+
 			args := p.args(u)
 			totalTimeout := float64(p.Count)*p.Timeout + float64(p.Count-1)*p.PingInterval
 
@@ -99,34 +111,33 @@ func (p *Ping) Gather(acc telegraf.Accumulator) error {
 					} else {
 						acc.AddError(err)
 					}
+					acc.AddFields("ping", fields, tags)
 					return
 				}
 			}
 
-			tags := map[string]string{"url": u}
 			trans, rec, min, avg, max, stddev, err := processPingOutput(out)
 			if err != nil {
 				// fatal error
 				acc.AddError(fmt.Errorf("%s: %s", err, u))
+				acc.AddFields("ping", fields, tags)
 				return
 			}
 			// Calculate packet loss percentage
 			loss := float64(trans-rec) / float64(trans) * 100.0
-			fields := map[string]interface{}{
-				"packets_transmitted": trans,
-				"packets_received":    rec,
-				"percent_packet_loss": loss,
-			}
-			if min > 0 {
+			fields["packets_transmitted"] = trans
+			fields["packets_received"] = rec
+			fields["percent_packet_loss"] = loss
+			if min >= 0 {
 				fields["minimum_response_ms"] = min
 			}
-			if avg > 0 {
+			if avg >= 0 {
 				fields["average_response_ms"] = avg
 			}
-			if max > 0 {
+			if max >= 0 {
 				fields["maximum_response_ms"] = max
 			}
-			if stddev > 0 {
+			if stddev >= 0 {
 				fields["standard_deviation_ms"] = stddev
 			}
 			acc.AddFields("ping", fields, tags)
@@ -145,7 +156,7 @@ func hostPinger(timeout float64, args ...string) (string, error) {
 	}
 	c := exec.Command(bin, args...)
 	out, err := internal.CombinedOutputTimeout(c,
-		time.Second*time.Duration(timeout+1))
+		time.Second*time.Duration(timeout+5))
 	return string(out), err
 }
 
@@ -187,14 +198,13 @@ func (p *Ping) args(url string) []string {
 // It returns (<transmitted packets>, <received packets>, <average response>)
 func processPingOutput(out string) (int, int, float64, float64, float64, float64, error) {
 	var trans, recv int
-	var min, avg, max, stddev float64
+	var min, avg, max, stddev float64 = -1.0, -1.0, -1.0, -1.0
 	// Set this error to nil if we find a 'transmitted' line
 	err := errors.New("Fatal error processing ping output")
 	lines := strings.Split(out, "\n")
 	for _, line := range lines {
 		if strings.Contains(line, "transmitted") &&
 			strings.Contains(line, "received") {
-			err = nil
 			stats := strings.Split(line, ", ")
 			// Transmitted packets
 			trans, err = strconv.Atoi(strings.Split(stats[0], " ")[0])
@@ -209,8 +219,17 @@ func processPingOutput(out string) (int, int, float64, float64, float64, float64
 		} else if strings.Contains(line, "min/avg/max") {
 			stats := strings.Split(line, " ")[3]
 			min, err = strconv.ParseFloat(strings.Split(stats, "/")[0], 64)
+			if err != nil {
+				return trans, recv, min, avg, max, stddev, err
+			}
 			avg, err = strconv.ParseFloat(strings.Split(stats, "/")[1], 64)
+			if err != nil {
+				return trans, recv, min, avg, max, stddev, err
+			}
 			max, err = strconv.ParseFloat(strings.Split(stats, "/")[2], 64)
+			if err != nil {
+				return trans, recv, min, avg, max, stddev, err
+			}
 			stddev, err = strconv.ParseFloat(strings.Split(stats, "/")[3], 64)
 			if err != nil {
 				return trans, recv, min, avg, max, stddev, err

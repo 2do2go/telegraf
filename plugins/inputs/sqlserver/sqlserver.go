@@ -245,10 +245,10 @@ UNION ALL
 SELECT 'Average pending disk IO', AveragePendingDiskIOCount = (SELECT AVG(pending_disk_io_count) FROM sys.dm_os_schedulers WITH (NOLOCK) WHERE scheduler_id < 255 )
 UNION ALL
 SELECT 'Buffer pool rate (bytes/sec)', BufferPoolRate = (1.0*cntr_value * 8 * 1024) /
-	(SELECT 1.0*cntr_value FROM sys.dm_os_performance_counters  WHERE object_name like '%Buffer Manager%' AND lower(counter_name) = 'Page life expectancy')
+	(SELECT 1.0*cntr_value FROM sys.dm_os_performance_counters  WHERE object_name like '%Buffer Manager%' AND counter_name = 'Page life expectancy')
 FROM sys.dm_os_performance_counters
 WHERE object_name like '%Buffer Manager%'
-AND counter_name = 'database pages'
+AND counter_name = 'Database pages'
 UNION ALL
 SELECT 'Memory grant pending', MemoryGrantPending = cntr_value
 FROM sys.dm_os_performance_counters
@@ -539,7 +539,7 @@ SELECT DatabaseName,  ReadLatency
 FROM #baseline
 WHERE datafile_type = ''LOG''
 ) as V
-PIVOT(SUM(ReadLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
+PIVOT(MAX(ReadLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
 
 UNION ALL
 
@@ -550,7 +550,7 @@ SELECT DatabaseName,  WriteLatency
 FROM #baseline
 WHERE datafile_type = ''LOG''
 ) as V
-PIVOT(SUM(WriteLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
+PIVOT(MAX(WriteLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
 
 UNION ALL
 
@@ -561,7 +561,7 @@ SELECT DatabaseName,  ReadLatency
 FROM #baseline
 WHERE datafile_type = ''ROWS''
 ) as V
-PIVOT(SUM(ReadLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
+PIVOT(MAX(ReadLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
 
 UNION ALL
 
@@ -572,7 +572,7 @@ SELECT DatabaseName,  WriteLatency
 FROM #baseline
 WHERE datafile_type = ''ROWS''
 ) as V
-PIVOT(SUM(WriteLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
+PIVOT(MAX(WriteLatency) FOR DatabaseName IN (' + @ColumnName + ')) AS PVTTable
 
 UNION ALL
 
@@ -1116,30 +1116,30 @@ DECLARE @delayInterval char(8) = CONVERT(Char(8), DATEADD(SECOND, @secondsBetwee
 
 DECLARE @w1 TABLE
 (
-	WaitType nvarchar(64) NOT NULL,
+	WaitType nvarchar(64) collate SQL_Latin1_General_CP1_CI_AS NOT NULL,
 	WaitTimeInMs bigint NOT NULL,
 	WaitTaskCount bigint NOT NULL,
 	CollectionDate datetime NOT NULL
 )
 DECLARE @w2 TABLE
 (
-	WaitType nvarchar(64) NOT NULL,
+	WaitType nvarchar(64) collate SQL_Latin1_General_CP1_CI_AS NOT NULL,
 	WaitTimeInMs bigint NOT NULL,
 	WaitTaskCount bigint NOT NULL,
 	CollectionDate datetime NOT NULL
 )
 DECLARE @w3 TABLE
 (
-	WaitType nvarchar(64) NOT NULL
+	WaitType nvarchar(64) collate SQL_Latin1_General_CP1_CI_AS NOT NULL
 )
 DECLARE @w4 TABLE
 (
-	WaitType nvarchar(64) NOT NULL,
-	WaitCategory nvarchar(64) NOT NULL
+	WaitType nvarchar(64) collate SQL_Latin1_General_CP1_CI_AS NOT NULL,
+	WaitCategory nvarchar(64) collate SQL_Latin1_General_CP1_CI_AS NOT NULL
 )
 DECLARE @w5 TABLE
 (
-	WaitCategory nvarchar(64) NOT NULL,
+	WaitCategory nvarchar(64) collate SQL_Latin1_General_CP1_CI_AS NOT NULL,
 	WaitTimeInMs bigint NOT NULL,
 	WaitTaskCount bigint NOT NULL
 )
@@ -1380,12 +1380,12 @@ INSERT @w4 (WaitType, WaitCategory) VALUES ('ABR', 'OTHER') ,
 
 INSERT @w1 (WaitType, WaitTimeInMs, WaitTaskCount, CollectionDate)
 SELECT
-  WaitType = wait_type
+  WaitType = wait_type  collate SQL_Latin1_General_CP1_CI_AS
 , WaitTimeInMs = SUM(wait_time_ms)
 , WaitTaskCount = SUM(waiting_tasks_count)
 , CollectionDate = GETDATE()
 FROM sys.dm_os_wait_stats
-WHERE [wait_type] NOT IN
+WHERE [wait_type]  collate SQL_Latin1_General_CP1_CI_AS NOT IN
 (
 	SELECT WaitType FROM  @w3
 )
@@ -1396,12 +1396,12 @@ WAITFOR DELAY @delayInterval;
 
 INSERT @w2 (WaitType, WaitTimeInMs, WaitTaskCount, CollectionDate)
 SELECT
-  WaitType = wait_type
+  WaitType = wait_type  collate SQL_Latin1_General_CP1_CI_AS
 , WaitTimeInMs = SUM(wait_time_ms)
 , WaitTaskCount = SUM(waiting_tasks_count)
 , CollectionDate = GETDATE()
 FROM sys.dm_os_wait_stats
-WHERE [wait_type] NOT IN
+WHERE [wait_type]  collate SQL_Latin1_General_CP1_CI_AS NOT IN
 (
 	SELECT WaitType FROM  @w3
 )

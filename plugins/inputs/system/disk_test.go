@@ -28,13 +28,13 @@ func TestDiskUsage(t *testing.T) {
 			Device:     "/dev/sda",
 			Mountpoint: "/",
 			Fstype:     "ext4",
-			Opts:       "",
+			Opts:       "ro,noatime,nodiratime",
 		},
 		{
 			Device:     "/dev/sdb",
 			Mountpoint: "/home",
 			Fstype:     "ext4",
-			Opts:       "",
+			Opts:       "rw,noatime,nodiratime,errors=remount-ro",
 		},
 	}
 	duAll := []disk.UsageStat{
@@ -62,8 +62,6 @@ func TestDiskUsage(t *testing.T) {
 
 	mps.On("Partitions", true).Return(psAll, nil)
 	mps.On("OSGetenv", "HOST_MOUNT_PREFIX").Return("")
-	mps.On("OSStat", "/").Return(MockFileInfo{}, nil)
-	mps.On("OSStat", "/home").Return(MockFileInfo{}, nil)
 	mps.On("PSDiskUsage", "/").Return(&duAll[0], nil)
 	mps.On("PSDiskUsage", "/home").Return(&duAll[1], nil)
 
@@ -78,11 +76,13 @@ func TestDiskUsage(t *testing.T) {
 		"path":   "/",
 		"fstype": "ext4",
 		"device": "sda",
+		"mode":   "ro",
 	}
 	tags2 := map[string]string{
 		"path":   "/home",
 		"fstype": "ext4",
 		"device": "sdb",
+		"mode":   "rw",
 	}
 
 	fields1 := map[string]interface{}{
@@ -115,6 +115,140 @@ func TestDiskUsage(t *testing.T) {
 	// / and /home
 	err = (&DiskStats{ps: &mps, MountPoints: []string{"/", "/home"}}).Gather(&acc)
 	assert.Equal(t, 2*expectedAllDiskMetrics+7, acc.NFields())
+}
+
+func TestDiskUsageHostMountPrefix(t *testing.T) {
+	tests := []struct {
+		name            string
+		partitionStats  []disk.PartitionStat
+		usageStats      []*disk.UsageStat
+		hostMountPrefix string
+		expectedTags    map[string]string
+		expectedFields  map[string]interface{}
+	}{
+		{
+			name: "no host mount prefix",
+			partitionStats: []disk.PartitionStat{
+				{
+					Device:     "/dev/sda",
+					Mountpoint: "/",
+					Fstype:     "ext4",
+					Opts:       "ro",
+				},
+			},
+			usageStats: []*disk.UsageStat{
+				&disk.UsageStat{
+					Path:  "/",
+					Total: 42,
+				},
+			},
+			expectedTags: map[string]string{
+				"path":   "/",
+				"device": "sda",
+				"fstype": "ext4",
+				"mode":   "ro",
+			},
+			expectedFields: map[string]interface{}{
+				"total":        uint64(42),
+				"used":         uint64(0),
+				"free":         uint64(0),
+				"inodes_total": uint64(0),
+				"inodes_free":  uint64(0),
+				"inodes_used":  uint64(0),
+				"used_percent": float64(0),
+			},
+		},
+		{
+			name: "host mount prefix",
+			partitionStats: []disk.PartitionStat{
+				{
+					Device:     "/dev/sda",
+					Mountpoint: "/hostfs/var",
+					Fstype:     "ext4",
+					Opts:       "ro",
+				},
+			},
+			usageStats: []*disk.UsageStat{
+				&disk.UsageStat{
+					Path:  "/hostfs/var",
+					Total: 42,
+				},
+			},
+			hostMountPrefix: "/hostfs",
+			expectedTags: map[string]string{
+				"path":   "/var",
+				"device": "sda",
+				"fstype": "ext4",
+				"mode":   "ro",
+			},
+			expectedFields: map[string]interface{}{
+				"total":        uint64(42),
+				"used":         uint64(0),
+				"free":         uint64(0),
+				"inodes_total": uint64(0),
+				"inodes_free":  uint64(0),
+				"inodes_used":  uint64(0),
+				"used_percent": float64(0),
+			},
+		},
+		{
+			name: "host mount prefix exact match",
+			partitionStats: []disk.PartitionStat{
+				{
+					Device:     "/dev/sda",
+					Mountpoint: "/hostfs",
+					Fstype:     "ext4",
+					Opts:       "ro",
+				},
+			},
+			usageStats: []*disk.UsageStat{
+				&disk.UsageStat{
+					Path:  "/hostfs",
+					Total: 42,
+				},
+			},
+			hostMountPrefix: "/hostfs",
+			expectedTags: map[string]string{
+				"path":   "/",
+				"device": "sda",
+				"fstype": "ext4",
+				"mode":   "ro",
+			},
+			expectedFields: map[string]interface{}{
+				"total":        uint64(42),
+				"used":         uint64(0),
+				"free":         uint64(0),
+				"inodes_total": uint64(0),
+				"inodes_free":  uint64(0),
+				"inodes_used":  uint64(0),
+				"used_percent": float64(0),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mck := &mock.Mock{}
+			mps := MockPSDisk{&systemPS{&mockDiskUsage{mck}}, mck}
+			defer mps.AssertExpectations(t)
+
+			var acc testutil.Accumulator
+			var err error
+
+			mps.On("Partitions", true).Return(tt.partitionStats, nil)
+
+			for _, v := range tt.usageStats {
+				mps.On("PSDiskUsage", v.Path).Return(v, nil)
+			}
+
+			mps.On("OSGetenv", "HOST_MOUNT_PREFIX").Return(tt.hostMountPrefix)
+
+			err = (&DiskStats{ps: mps}).Gather(&acc)
+			require.NoError(t, err)
+
+			acc.AssertContainsTaggedFields(t, "disk", tt.expectedFields, tt.expectedTags)
+		})
+	}
 }
 
 func TestDiskStats(t *testing.T) {
@@ -163,13 +297,13 @@ func TestDiskStats(t *testing.T) {
 			Device:     "/dev/sda",
 			Mountpoint: "/",
 			Fstype:     "ext4",
-			Opts:       "",
+			Opts:       "ro,noatime,nodiratime",
 		},
 		{
 			Device:     "/dev/sdb",
 			Mountpoint: "/home",
 			Fstype:     "ext4",
-			Opts:       "",
+			Opts:       "rw,noatime,nodiratime,errors=remount-ro",
 		},
 	}
 
@@ -178,7 +312,7 @@ func TestDiskStats(t *testing.T) {
 			Device:     "/dev/sda",
 			Mountpoint: "/",
 			Fstype:     "ext4",
-			Opts:       "",
+			Opts:       "ro,noatime,nodiratime",
 		},
 	}
 
@@ -197,11 +331,13 @@ func TestDiskStats(t *testing.T) {
 		"path":   "/",
 		"fstype": "ext4",
 		"device": "sda",
+		"mode":   "ro",
 	}
 	tags2 := map[string]string{
 		"path":   "/home",
 		"fstype": "ext4",
 		"device": "sdb",
+		"mode":   "rw",
 	}
 
 	fields1 := map[string]interface{}{
