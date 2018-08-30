@@ -34,7 +34,10 @@ type Ping struct {
 	// Ping timeout, in seconds. 0 means no timeout (ping -W <TIMEOUT>)
 	Timeout float64
 
-	// Interface to send ping from (ping -I <INTERFACE>)
+	// Ping deadline, in seconds. 0 means no deadline. (ping -w <DEADLINE>)
+	Deadline int
+
+	// Interface or source address to send ping from (ping -I/-S <INTERFACE/SRC_ADDR>)
 	Interface string
 
 	// URLs to ping
@@ -60,7 +63,10 @@ const sampleConfig = `
   # ping_interval = 1.0
   ## per-ping timeout, in s. 0 == no timeout (ping -W <TIMEOUT>)
   # timeout = 1.0
-  ## interface to send ping from (ping -I <INTERFACE>)
+  ## total-ping deadline, in s. 0 == no deadline (ping -w <DEADLINE>)
+  # deadline = 10
+  ## interface or source address to send ping from (ping -I <INTERFACE/SRC_ADDR>)
+  ## on Darwin and Freebsd only source address possible: (ping -S <SRC_ADDR>)
   # interface = ""
 `
 
@@ -107,9 +113,9 @@ func (p *Ping) Gather(acc telegraf.Accumulator) error {
 					// Combine go err + stderr output
 					out = strings.TrimSpace(out)
 					if len(out) > 0 {
-						acc.AddError(fmt.Errorf("%s, %s", out, err))
+						acc.AddError(fmt.Errorf("host %s: %s, %s", u, out, err))
 					} else {
-						acc.AddError(err)
+						acc.AddError(fmt.Errorf("host %s: %s", u, err))
 					}
 					acc.AddFields("ping", fields, tags)
 					return
@@ -178,8 +184,27 @@ func (p *Ping) args(url string) []string {
 			args = append(args, "-W", strconv.FormatFloat(p.Timeout, 'f', 1, 64))
 		}
 	}
+	if p.Deadline > 0 {
+		switch runtime.GOOS {
+		case "darwin":
+			args = append(args, "-t", strconv.Itoa(p.Deadline))
+		case "linux":
+			args = append(args, "-w", strconv.Itoa(p.Deadline))
+		default:
+			// Not sure the best option here, just assume GNU ping?
+			args = append(args, "-w", strconv.Itoa(p.Deadline))
+		}
+	}
 	if p.Interface != "" {
-		args = append(args, "-I", p.Interface)
+		switch runtime.GOOS {
+		case "linux":
+			args = append(args, "-I", p.Interface)
+		case "freebsd", "darwin":
+			args = append(args, "-S", p.Interface)
+		default:
+			// Not sure the best option here, just assume GNU ping?
+			args = append(args, "-I", p.Interface)
+		}
 	}
 	args = append(args, url)
 	return args
@@ -246,6 +271,7 @@ func init() {
 			PingInterval: 1.0,
 			Count:        1,
 			Timeout:      1.0,
+			Deadline:     10,
 		}
 	})
 }
