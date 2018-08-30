@@ -95,7 +95,7 @@ supported_packages = {
     "freebsd": [ "tar" ]
 }
 
-next_version = '1.6.0'
+next_version = '1.7.0'
 
 ################
 #### Telegraf Functions
@@ -452,13 +452,14 @@ def build(version=None,
             build_command += "CGO_ENABLED=0 "
 
         # Handle variations in architecture output
+        goarch = arch
         if arch == "i386" or arch == "i686":
-            arch = "386"
+            goarch = "386"
         elif "arm64" in arch:
-            arch = "arm64"
+            goarch = "arm64"
         elif "arm" in arch:
-            arch = "arm"
-        build_command += "GOOS={} GOARCH={} ".format(platform, arch)
+            goarch = "arm"
+        build_command += "GOOS={} GOARCH={} ".format(platform, goarch)
 
         if "arm" in arch:
             if arch == "armel":
@@ -694,7 +695,7 @@ def main(args):
     orig_branch = get_current_branch()
 
     if args.platform not in supported_builds and args.platform != 'all':
-        logging.error("Invalid build platform: {}".format(target_platform))
+        logging.error("Invalid build platform: {}".format(args.platform))
         return 1
 
     build_output = {}
