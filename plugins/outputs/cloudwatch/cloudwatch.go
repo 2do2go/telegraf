@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cloudwatch"
+	"github.com/aws/aws-sdk-go/service/sts"
 
 	"github.com/influxdata/telegraf"
 	internalaws "github.com/influxdata/telegraf/internal/config/aws"
@@ -83,6 +84,7 @@ func (c *CloudWatch) Connect() error {
 	}
 
 	c.svc = cloudwatch.New(configProvider)
+
 	return nil
 }
 

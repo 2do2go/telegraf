@@ -27,24 +27,6 @@ const (
 	UintSupport FieldTypeSupport = 1 << iota
 )
 
-// MetricError is an error causing a metric to be unserializable.
-type MetricError struct {
-	s string
-}
-
-func (e MetricError) Error() string {
-	return e.s
-}
-
-// FieldError is an error causing a field to be unserializable.
-type FieldError struct {
-	s string
-}
-
-func (e FieldError) Error() string {
-	return e.s
-}
-
 var (
 	NeedMoreSpace = "need more space"
 	InvalidName   = "invalid name"

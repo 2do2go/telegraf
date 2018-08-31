@@ -2,7 +2,6 @@ package influx
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"log"
 

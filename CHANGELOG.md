@@ -1,4 +1,3 @@
-## v1.4.2 [unreleased]
 ## v1.7.4 [2018-08-29]
 
 ### Bugfixes
@@ -160,7 +159,6 @@
 ## v1.6.1 [2018-04-23]
 
 ### Bugfixes
-- [#3835](https://github.com/influxdata/telegraf/pull/3835): Report mem input fields as gauges instead counters.
 
 - [#3835](https://github.com/influxdata/telegraf/issues/3835): Report mem input fields as gauges instead counters.
 - [#4030](https://github.com/influxdata/telegraf/issues/4030): Fix graphite outputs unsigned integers in wrong format.
@@ -291,7 +289,6 @@
 - [#3729](https://github.com/influxdata/telegraf/issues/3729): Set path to / if HOST_MOUNT_PREFIX matches full path.
 - [#3739](https://github.com/influxdata/telegraf/issues/3739): Remove userinfo from url tag in prometheus input.
 - [#3778](https://github.com/influxdata/telegraf/issues/3778): Fix ping plugin not reporting zero durations.
-- [#3807](https://github.com/influxdata/telegraf/issues/3807): Fix memory leak in postgresql_extensible.
 - [#3697](https://github.com/influxdata/telegraf/issues/3697): Disable keepalive in mqtt output to prevent deadlock.
 - [#3786](https://github.com/influxdata/telegraf/pull/3786): Fix collation difference in sqlserver input.
 - [#3871](https://github.com/influxdata/telegraf/pull/3871): Fix uptime metric in passenger input plugin.
@@ -621,7 +618,6 @@
 - [#2948](https://github.com/influxdata/telegraf/issues/2948): Fix bug parsing default timestamps with modified precision.
 - [#2954](https://github.com/influxdata/telegraf/issues/2954): Fix panic in elasticsearch input if cannot determine master.
 
-## v1.3.2 [unreleased]
 ## v1.3.2 [2017-06-14]
 
 ### Bugfixes
