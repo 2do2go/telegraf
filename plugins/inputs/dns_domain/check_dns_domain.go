@@ -32,7 +32,7 @@ func (c *CheckExpire) SampleConfig() string {
 // Check and return domain expiration date
 func (c *CheckExpire) checkDomain(domain string) (time.Time, error) {
 	rawResponse, _ := whois.Whois(domain)
-    response, err := whois_parser.Parser(rawResponse)
+    response, err := whois_parser.Parse(rawResponse)
 
     if err != nil {
     	return time.Time{}, errors.New("Cannot parse raw whois response")
